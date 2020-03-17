@@ -1,13 +1,12 @@
 import { PointerComponent } from './pointer'
 import { SnapshotData } from '@WebReplay/snapshot'
 import { updateDom } from './dom'
-import { reduxStore, PlayerTypes, ProgressState } from '@WebReplay/utils'
+import { reduxStore, PlayerTypes, ProgressState, getTime } from '@WebReplay/utils'
 import { ProgressComponent } from './progress'
 import { ContainerComponent } from './container'
 
 export class PlayerComponent {
     data: SnapshotData[]
-    delayTime = 5000
     speed = 0
     index = 0
     frameIndex = 0
@@ -47,13 +46,13 @@ export class PlayerComponent {
         cancelAnimationFrame(this.requestID)
         this.requestID = requestAnimationFrame(loop.bind(this))
 
-        const initTime = Date.now()
+        const initTime = getTime()
         this.startTime = 0
 
         const { endTime } = this.progressState
 
         function loop(this: PlayerComponent) {
-            const timeStamp = Date.now() - initTime
+            const timeStamp = getTime() - initTime
             if (this.frameIndex > 0 && !this.frames[this.frameIndex + 1]) {
                 this.stop()
                 return
@@ -66,9 +65,7 @@ export class PlayerComponent {
             const nextTime = Number(this.frames[this.frameIndex + 1])
 
             if (currTime >= nextTime) {
-                this.frameIndex++
-
-                this.progress.updateTimer((endTime - nextTime + this.delayTime) / 1000)
+                this.progress.updateTimer((endTime - nextTime) / 1000)
                 const progress = (this.frameIndex / this.frames.length) * 100
 
                 if (progress - this.lastPercentage > this.getPercentInterval()) {
@@ -77,8 +74,12 @@ export class PlayerComponent {
                 }
 
                 if (this.data[this.index] && currTime > +this.data[this.index].time) {
-                    this.execFrame.call(this, this.data[this.index])
-                    this.index++
+                    while (+this.data[this.index].time <= this.frames[this.frameIndex]) {
+                        this.execFrame.call(this, this.data[this.index])
+                        this.index++
+                    }
+
+                    this.frameIndex++
                 }
             }
 
@@ -119,7 +120,7 @@ export class PlayerComponent {
         const { startTime, endTime } = this.progressState
 
         const s = +startTime
-        const e = +endTime + this.delayTime
+        const e = +endTime
 
         const result: number[] = []
 
